@@ -52,6 +52,8 @@
 #include <vtkRenderWindowInteractor.h>
 #include <vtkSmartPointer.h>
 
+#include <cmath>
+
 
 // ****************************************************************************
 //  Function: GetNumberOfPoints
@@ -303,11 +305,46 @@ Takes a Cell
 Returns the Integer Corresponding to the Isoline Case
 *************************************/
 int
-IdentifyCase (const float isoValue, int *vertices)
+IdentifyCase (const float isoValue, float *vertices)
 {
-    return 0;
+    int counter = 0;
+    for (int i = 0; i < 4; i++) {
+        if (vertices[i] > isoValue){
+            counter += pow(2, i);
+        }
+    }
+    return counter;
 }
 
+/**************************************
+Generate Segments function
+
+Takes a reference to an integer array (length 16)
+the length is hardcoded into the program and thus not checked for/protected against array outof bounds
+Fills the Array with NumSegments in Each Case
+Returns Nothing
+
+**************************************/
+void
+GenerateSegments(int* arr)
+{
+    arr[0] = 0;
+    arr[1] = 1;
+    arr[2] = 1;
+    arr[3] = 1;
+    arr[4] = 1;
+    arr[5] = 1;
+    arr[6] = 2;
+    arr[7] = 1;
+    arr[8] = 1;
+    arr[9] = 2;
+    arr[10] = 1;
+    arr[11] = 1;
+    arr[12] = 1;
+    arr[13] = 1;
+    arr[14] = 1;
+    arr[15] = 0;
+}
 
 /************************************
 GenerateTable function
@@ -392,7 +429,12 @@ int main()
     const float isoValue = 3.20;
     int lookupTable[tableWidth][tableHeight];
     int numCells =0;
+    int vertexPointIndices[4];
     int logicalPointIndices_ForVertices[8];
+    float scalarValsAtVertices[4];
+    int iCase;
+    int nSegment;
+    int numSegments[16];
 
     vtkDataSetReader *rdr = vtkDataSetReader::New();
     rdr->SetFileName("proj5.vtk");
@@ -415,39 +457,59 @@ int main()
     sl.AddSegment(+10, -10, +10, +10);
 
 // YOUR CODE TO GENERATE ISOLINES SHOULD GO HERE!
-    //Generate LookUp Table
+    //Generate LookUp Table and num segments table
     GenerateTable(lookupTable);
-
-    //Get Num Cells
-    numCells = GetNumberOfCells(dims);
+    GenerateSegments(numSegments);
+    //Get bounds
     int xDims = dims[0];
     int yDims = dims[1];
 
     //for each cell in the grid
     for (i=0; i < yDims; i++){
         for (j=0; j < xDims; j++) {
+            iCase = 0;
+            
+            //Get the logical point indices, then the point index at each vertex
             // (j, i) is the logical point index of Vertex0 of each cell
             logicalPointIndices_ForVertices[0] = j;
             logicalPointIndices_ForVertices[1] = i;
+            vertexPointIndices[0] = GetPointIndex(logicalPointIndices_ForVertices, dims);
             //Then vertex V1's logical point vertices are j+1, i
-            logicalPointIndices_ForVertices = j+1;
-            logicalPointIndices_ForVertices = i;
+            logicalPointIndices_ForVertices[2] = j+1;
+            logicalPointIndices_ForVertices[3] = i;
+            vertexPointIndices[1] = GetPointIndex(logicalPointIndices_ForVertices+2, dims);
             //Vertex V2's logical point vertices are j+1, i+1
-            logicalPointIndices_ForVertices = j+1;
-            logicalPointIndices_ForVertices = i+1;
+            logicalPointIndices_ForVertices[4] = j+1;
+            logicalPointIndices_ForVertices[5] = i+1;
+            vertexPointIndices[2] = GetPointIndex(logicalPointIndices_ForVertices+4, dims);
             //Vertex V3's logical point vertices are j, i+1
-            logicalPointIndices_ForVertices = j;
-            logicalPointIndices_ForVertices = i+1;
+            logicalPointIndices_ForVertices[6] = j;
+            logicalPointIndices_ForVertices[7] = i+1;
+            vertexPointIndices[3] = GetPointIndex(logicalPointIndices_ForVertices+6, dims);
+            
 
-            cerr << GetPointIndex(pointIndices, dims) << " ";
-        //identify case
-        //get num segments
-        //for i < num segments
-            //int edge1 = lup[icase][2*i];
-            //float	pt1[2]		=	//	Interpolate	position	along	edge1
-            //int edge2	=	lup[icase][2*i+1];
-            //float	pt2[2]	=	//	Interpolate	position	along	edge2
-            //AddSegment(pt1,	pt2);
+            //Get Scalar Value At Each Vertex
+            //V0
+            scalarValsAtVertices[0] = F[ vertexPointIndices[0] ];
+            //V1
+            scalarValsAtVertices[1] = F[ vertexPointIndices[1] ];
+            //V2
+            scalarValsAtVertices[2] = F[ vertexPointIndices[2] ];
+            //V3
+            scalarValsAtVertices[3] = F[ vertexPointIndices[3] ];
+        
+            //identify case
+            iCase = IdentifyCase(isoValue, scalarValsAtVertices);
+            //get num segments
+            nSegment = numSegments[iCase];
+            for (i = 0; i < nSegment; i++){
+                int edge1 = lup[icase][2*i];
+                float	pt1[2]		=	//	Interpolate	position	along	edge1
+                int edge2	=	lup[icase][2*i+1];
+                float	pt2[2]	=	//	Interpolate	position	along	edge2
+                //AddSegment(pt1,	pt2);
+            }
+
         }
     }
 
