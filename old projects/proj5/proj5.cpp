@@ -260,44 +260,6 @@ SegmentList::MakePolyData(void)
     return pd;
 }
 
-
-/***************************************************************************
-// Function: getT
-//
-// Arguments:
-//      X: float val to interpolate
-//      A: float val to interpolate between
-//      B: float val to interpolate between
-
-//  Returns: the float value for T
-**************************************************************************/
-
-
-float
-GetT(const float X, const float A, const float B) {
-    return ((X-A)/(B-A));
-}
-
-// ****************************************************************************
-//  Function: Interpolate
-//
-//  Arguments:
-//     Fa: F(A)
-//     Fb: F(B)
-//     X: The value we want to interpolate
-//     A, B
-//
-//
-//   Returns: An interpolated value
-//
-// ****************************************************************************
-void
-Interpolate(const float Fa, const float Fb, const float X, const float A, const float B, float *returnVal)
-{
-    float t = GetT(X, A, B);
-    *returnVal = (Fa + (t * (Fb-Fa)));
-}
-
 /************************************
 IdentifyCase Function
 
@@ -420,21 +382,49 @@ GenerateTable(int lup[][4])
     lup[15][0] = lup[15][1] = lup[15][2] = lup[15][3] = -1;
 }
 
+/************************************
+GenerateEdges function
+
+Takes a reference to 4x2 integer array
+Fills the Array with which vertices correspond to which edge
+Ex: Edge 0 corresponds to vertices 1 and 0
+    Edge 2 corersponds to vertices 2 and 1
+Returns Nothing
+*************************************/
+
+void
+GenerateEdges(int arr[][2]) {
+    //edge 0
+    arr[0][0] = 0;
+    arr[0][1] = 1;
+    //edge 1
+    arr[1][0] = 1;
+    arr[1][1] = 3;
+    //edge2
+    arr[2][0] = 2;
+    arr[2][1] = 3;
+    //edge3
+    arr[3][0] = 0;
+    arr[3][1] = 2;
+    return;
+}
 
 int main()
 {
-    int  i, j;
+    int  i, j, k;
     const int tableWidth = 16;
     const int tableHeight = 4;
     const float isoValue = 3.20;
-    int lookupTable[tableWidth][tableHeight];
+
     int numCells =0;
-    int vertexPointIndices[4];
-    int logicalPointIndices_ForVertices[8];
     float scalarValsAtVertices[4];
     int iCase;
     int nSegment;
+
+    //Lookup Tables
+    int lookupTable[tableWidth][tableHeight];
     int numSegments[16];
+    int edges [4][2];
 
     vtkDataSetReader *rdr = vtkDataSetReader::New();
     rdr->SetFileName("proj5.vtk");
@@ -460,57 +450,90 @@ int main()
     //Generate LookUp Table and num segments table
     GenerateTable(lookupTable);
     GenerateSegments(numSegments);
-    //Get bounds
-    int xDims = dims[0];
-    int yDims = dims[1];
+    GenerateEdges(edges);
+    numCells = GetNumberOfCells(dims);
+    
+    //Stuff to be moved up later
+    int idx[2];
+    int logicalVertices[4][2];
+    int pointIndices[4];
+    for (i=0; i < numCells; i++) {
+        //Store logical point indices for V0
+        GetLogicalCellIndex(logicalVertices[0], i, dims);
 
-    //for each cell in the grid
-    for (i=0; i < yDims; i++){
-        for (j=0; j < xDims; j++) {
-            iCase = 0;
-            
-            //Get the logical point indices, then the point index at each vertex
-            // (j, i) is the logical point index of Vertex0 of each cell
-            logicalPointIndices_ForVertices[0] = j;
-            logicalPointIndices_ForVertices[1] = i;
-            vertexPointIndices[0] = GetPointIndex(logicalPointIndices_ForVertices, dims);
-            //Then vertex V1's logical point vertices are j+1, i
-            logicalPointIndices_ForVertices[2] = j+1;
-            logicalPointIndices_ForVertices[3] = i;
-            vertexPointIndices[1] = GetPointIndex(logicalPointIndices_ForVertices+2, dims);
-            //Vertex V2's logical point vertices are j+1, i+1
-            logicalPointIndices_ForVertices[4] = j+1;
-            logicalPointIndices_ForVertices[5] = i+1;
-            vertexPointIndices[2] = GetPointIndex(logicalPointIndices_ForVertices+4, dims);
-            //Vertex V3's logical point vertices are j, i+1
-            logicalPointIndices_ForVertices[6] = j;
-            logicalPointIndices_ForVertices[7] = i+1;
-            vertexPointIndices[3] = GetPointIndex(logicalPointIndices_ForVertices+6, dims);
-            
+        //V0
+        idx[0] = logicalVertices[0][0];
+        idx[1] = logicalVertices[0][1];
 
-            //Get Scalar Value At Each Vertex
-            //V0
-            scalarValsAtVertices[0] = F[ vertexPointIndices[0] ];
-            //V1
-            scalarValsAtVertices[1] = F[ vertexPointIndices[1] ];
-            //V2
-            scalarValsAtVertices[2] = F[ vertexPointIndices[2] ];
-            //V3
-            scalarValsAtVertices[3] = F[ vertexPointIndices[3] ];
-        
-            //identify case
-            iCase = IdentifyCase(isoValue, scalarValsAtVertices);
-            //get num segments
-            nSegment = numSegments[iCase];
-            for (i = 0; i < nSegment; i++){
-                int edge1 = lup[icase][2*i];
-                float	pt1[2]		=	//	Interpolate	position	along	edge1
-                int edge2	=	lup[icase][2*i+1];
-                float	pt2[2]	=	//	Interpolate	position	along	edge2
-                //AddSegment(pt1,	pt2);
+        //V1
+        logicalVertices[1][0] = idx[0]+1;
+        logicalVertices[1][1] = idx[1];
+
+        //V2
+        logicalVertices[2][0] = idx[0];
+        logicalVertices[2][1] = idx[1]+1;
+
+        //V3
+        logicalVertices[3][0] = idx[0]+1;
+        logicalVertices[3][1] = idx[1]+1;
+
+        //Get Point Indices
+        pointIndices[0] = GetPointIndex(logicalVertices[0], dims);
+        pointIndices[1] = GetPointIndex(logicalVertices[1], dims);
+        pointIndices[2] = GetPointIndex(logicalVertices[2], dims);
+        pointIndices[3] = GetPointIndex(logicalVertices[3], dims);
+
+        //Get Scalar Values at Vertices
+        scalarValsAtVertices[0] = F[pointIndices[0]];
+        scalarValsAtVertices[1] = F[pointIndices[1]];
+        scalarValsAtVertices[2] = F[pointIndices[2]];
+        scalarValsAtVertices[3] = F[pointIndices[3]];
+
+        //Get Case
+        iCase = IdentifyCase(isoValue, scalarValsAtVertices);
+
+        //Get Num Segments
+        nSegment = numSegments[iCase];
+        if (nSegment != 0) {
+            for (j=0; j < nSegment; j++) {
+                float pt1[2];
+                int edge1 = lookupTable[iCase][2*j];
+
+                //Get Logic
+                int lowX = logicalVertices[edges[edge1][0]][0];
+                int lowY = logicalVertices[edges[edge1][0]][1];
+
+                int highX = logicalVertices[edges[edge1][1]][0];
+                int highY = logicalVertices[edges[edge1][1]][1];
+
+                float scalarLow = scalarValsAtVertices[edges[edge1][0]];
+                float scalarHigh = scalarValsAtVertices[edges[edge1][1]];
+
+                
+                
+                pt1[0] = X[lowX] + ((isoValue-scalarLow) / (scalarHigh-scalarLow)) * (X[highX]-X[lowX]);
+                pt1[1] = Y[lowY] + ((isoValue-scalarLow) / (scalarHigh-scalarLow)) * (Y[highY]-Y[lowY]);
+
+                int edge2 = lookupTable[iCase][2*j+1];
+                float pt2[2];
+
+                lowX = logicalVertices[edges[edge2][0]][0];
+                lowY = logicalVertices[edges[edge2][0]][1];
+
+                highX = logicalVertices[edges[edge2][1]][0];
+                highY = logicalVertices[edges[edge2][1]][1];
+
+                scalarLow = scalarValsAtVertices[edges[edge2][0]];
+                scalarHigh = scalarValsAtVertices[edges[edge2][1]];
+
+                pt2[0] = X[lowX] + ((isoValue-scalarLow) / (scalarHigh-scalarLow)) * (X[highX]-X[lowX]);
+                pt2[1] = Y[lowY] + ((isoValue-scalarLow) / (scalarHigh-scalarLow)) * (Y[highY]-Y[lowY]);
+                
+                sl.AddSegment(pt1[0], pt1[1], pt2[0], pt2[1]);
             }
-
         }
+
+
     }
 
 
