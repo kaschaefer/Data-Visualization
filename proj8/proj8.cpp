@@ -1,8 +1,48 @@
 #include <vtkDataSetReader.h>
 #include <vtkContourFilter.h>
 #include <vtkDataSetWriter.h>
+#include <vtkSmartPointer.h>
+#include <vtkActor.h>
+#include <vtkRenderer.h>
 
-int main(){
+int main(int argc, char* argv[]){
+    //Get DataSet Reader
+    vtkDataSetReader *rdr = vtkDataSetReader::New();
+    rdr->SetFileName("proj8.vtk");
+    rdr->Update();
+
+    //hardyglobal is a field F
+    vtkContourFilter *cf = vtkContourFilter::New();
+    cf->SetValue(2, 2.5, 5.0);
+
+
+    //Contour Filter for IsoSurfacing Renderer 1
+        //set active attribute for contour filter?
+
+    //Slice Filter for Renderer 2
+
+    //grad is a field F
+    //Get NEW F
+
+    //Hedgehog filter for Renderer 3
+        //hedgehog filter -- needs to be pointed at the data
+        //Set active attribute
+
+    //Streamlines filter for Renderer 4
+
+
+    //polyDataMapper
+    //2 actors per isosurface
+
+
+    //color map colors need to be pointed at data set by data set mapper
+    //set scalar range -- for color map
+
+    //print method?????
+
+
+
+
     //Make Shapes
 
 
@@ -29,9 +69,8 @@ int main(){
 
     //Add Interactor
     renderWindowInteractor->SetRenderWindow(rendWindow);
-    
 
-    //Add the stuff to its respective renderer
+    //Add Actor to Renderer, Set Background and Size
 
     //Invokes Initial Render
     iren->Initiate();
