@@ -1,9 +1,27 @@
 #include <vtkDataSetReader.h>
 #include <vtkContourFilter.h>
 #include <vtkDataSetWriter.h>
+#include <vtkPolyDataMapper.h>
 #include <vtkSmartPointer.h>
 #include <vtkActor.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
+#include <vtkDataSetMapper.h>
+#include <vtkCamera.h>
+#include <vtkCutter.h>
+#include <vtkPlane.h>
+#include <vtkProperty.h>
+#include <vtkHedgeHog.h>
+#include <vtkPointData.h>
+#include <vtkDataSetAttributes.h>
+#include <vtkThreshold.h>
+#include <vtkArrowSource.h>
+#include <vtkGlyph3D.h>
+#include <vtkDataSet.h>
+
+
+#include <iostream>
 
 int main(int argc, char* argv[]){
     //Get DataSet Reader
@@ -11,41 +29,128 @@ int main(int argc, char* argv[]){
     rdr->SetFileName("proj8.vtk");
     rdr->Update();
 
-    //hardyglobal is a field F
+    //Get HardyGlobal Data
+    vtkDataSet *hardyGlobal = rdr->GetOutput();
+    hardyGlobal->GetPointData()->SetActiveScalars("hardyglobal");
+
+    //***Data Flow for Renderer 1
+    //Configure Contour Filter
     vtkContourFilter *cf = vtkContourFilter::New();
-    cf->SetValue(2, 2.5, 5.0);
+    cf->SetNumberOfContours(2);
+    cf->SetValue(0, 2.5);
+    cf->SetValue(1, 5.0);
+    cf->SetInputData(hardyGlobal);
+    cf->Update();
 
+    //Map Data to Filter
+    vtkSmartPointer<vtkDataSetMapper> contourMapper = vtkSmartPointer<vtkDataSetMapper>::New();
+    contourMapper->SetInputConnection(cf->GetOutputPort());
+    contourMapper->SetScalarRange(rdr->GetOutput()->GetPointData()->GetScalars()->GetRange());
 
-    //Contour Filter for IsoSurfacing Renderer 1
-        //set active attribute for contour filter?
+    //***Data Flow for Renderer 2
+    //Configure Complete 3D Data Set
+    vtkSmartPointer<vtkDataSetMapper> rectMapper = vtkSmartPointer<vtkDataSetMapper>::New();
+    rectMapper->SetInputData(hardyGlobal);
+    rectMapper->Update();
+    
+    //Create Planes
+    vtkSmartPointer<vtkPlane> plane = vtkSmartPointer<vtkPlane>::New();
+    vtkSmartPointer<vtkPlane> plane2 = vtkSmartPointer<vtkPlane>::New();
+    vtkSmartPointer<vtkPlane> plane3 = vtkSmartPointer<vtkPlane>::New();
+    
+    plane->SetOrigin(0,0,0);
+    plane->SetNormal(0,0,1);
+    plane2->SetOrigin(0,0,0);
+    plane2->SetNormal(0,1,0);
+    plane3->SetOrigin(0,0,0);
+    plane3->SetNormal(1,0,0);
 
-    //Slice Filter for Renderer 2
+    //Configure Cut Filters to Cut Planes
+    vtkSmartPointer<vtkCutter> cutter = vtkSmartPointer<vtkCutter>::New();
+    vtkSmartPointer<vtkCutter> cutter2 = vtkSmartPointer<vtkCutter>::New();
+    vtkSmartPointer<vtkCutter> cutter3 = vtkSmartPointer<vtkCutter>::New();
+
+    cutter->SetCutFunction(plane);
+    cutter->SetInputData(hardyGlobal);
+    cutter2->SetCutFunction(plane2);
+    cutter2->SetInputData(hardyGlobal);
+    cutter3->SetCutFunction(plane3);
+    cutter3->SetInputData(hardyGlobal);
+
+    cutter->Update();
+    cutter2->Update();
+    cutter3->Update();
+
+    //Map Data to Filter
+    vtkSmartPointer<vtkDataSetMapper> cutterMapper = vtkSmartPointer<vtkDataSetMapper>::New();
+    vtkSmartPointer<vtkDataSetMapper> cutterMapper2 = vtkSmartPointer<vtkDataSetMapper>::New();
+    vtkSmartPointer<vtkDataSetMapper> cutterMapper3 = vtkSmartPointer<vtkDataSetMapper>::New();    
+    cutterMapper->SetInputConnection(cutter->GetOutputPort());
+    cutterMapper2->SetInputConnection(cutter2->GetOutputPort());
+    cutterMapper3->SetInputConnection(cutter3->GetOutputPort());
+    cutterMapper->SetScalarRange(rdr->GetOutput()->GetPointData()->GetScalars()->GetRange());
+    cutterMapper2->SetScalarRange(rdr->GetOutput()->GetPointData()->GetScalars()->GetRange());
+    cutterMapper3->SetScalarRange(rdr->GetOutput()->GetPointData()->GetScalars()->GetRange());
+
 
     //grad is a field F
-    //Get NEW F
-
     //Hedgehog filter for Renderer 3
-        //hedgehog filter -- needs to be pointed at the data
-        //Set active attribute
+    //hedgehog filter -- needs to be pointed at the data
+    //Set active attribute
+    vtkDataSet *grad = rdr->GetOutput();
+    grad->GetPointData()->SetActiveVectors("grad");
+    vtkSmartPointer<vtkHedgeHog> hedgehog = vtkSmartPointer<vtkHedgeHog>::New();
+    vtkSmartPointer<vtkArrowSource> arrowSource = vtkSmartPointer<vtkArrowSource>::New();
+    vtkSmartPointer<vtkGlyph3D> glyph = vtkSmartPointer<vtkGlyph3D>::New();
+
+    hedgehog->SetInputData(grad);
+    hedgehog->SetScaleFactor(0.1);
+
+    glyph->SetInputConnection(hedgehog->GetOutputPort());
+    glyph->SetSourceConnection(arrowSource->GetOutputPort());
+    glyph->SetScaleModeToScaleByVector();
+    glyph->SetScaleFactor(0.1);
+
+    vtkSmartPointer<vtkDataSetMapper> hedgeHogMapper = vtkSmartPointer<vtkDataSetMapper>::New();
+    hedgeHogMapper->SetInputConnection(hedgehog->GetOutputPort());
+    hedgeHogMapper->SetScalarRange(rdr->GetOutput()->GetPointData()->GetScalars()->GetRange());
+
+    vtkSmartPointer<vtkActor> hedgehogActor = vtkSmartPointer<vtkActor>::New();
+    hedgehogActor->SetMapper(hedgeHogMapper);
+    hedgehogActor->GetProperty()->SetColor(0,0,0);
+
+
 
     //Streamlines filter for Renderer 4
 
+    //Actors
+        //Renderer 1
+    vtkSmartPointer<vtkActor> ren1Actor = vtkSmartPointer<vtkActor>::New();
+    ren1Actor->SetMapper(contourMapper);
 
-    //polyDataMapper
-    //2 actors per isosurface
+        //Renderer 2
+    vtkSmartPointer<vtkActor> planeActor = vtkSmartPointer<vtkActor>::New();
+    vtkSmartPointer<vtkActor> plane2Actor = vtkSmartPointer<vtkActor>::New();
+    vtkSmartPointer<vtkActor> plane3Actor = vtkSmartPointer<vtkActor>::New();
 
+    planeActor->GetProperty()->SetColor(255,255,0);
+    planeActor->GetProperty()->SetLineWidth(2);
+    planeActor->SetMapper(cutterMapper);
+    
+    plane2Actor->GetProperty()->SetColor(255,255,0);
+    plane2Actor->GetProperty()->SetLineWidth(2);
+    plane2Actor->SetMapper(cutterMapper2);
+    
+    plane3Actor->GetProperty()->SetColor(255,255,0);
+    plane3Actor->GetProperty()->SetLineWidth(2);
+    plane3Actor->SetMapper(cutterMapper3);
 
-    //color map colors need to be pointed at data set by data set mapper
-    //set scalar range -- for color map
-
-    //print method?????
-
-
-
-
-    //Make Shapes
-
-
+    vtkSmartPointer<vtkActor> rectActor = vtkSmartPointer<vtkActor>::New();
+    rectActor->GetProperty()->SetOpacity(0.5);
+    rectActor->GetProperty()->SetColor(255,255,255);
+    rectActor->SetMapper(rectMapper);
+        
+    //Set Up Render Window and Interactor
     vtkSmartPointer<vtkRenderWindow> rendWindow = vtkSmartPointer<vtkRenderWindow>::New();
     vtkSmartPointer<vtkRenderWindowInteractor> iren = vtkSmartPointer<vtkRenderWindowInteractor>::New();
 
@@ -57,9 +162,9 @@ int main(int argc, char* argv[]){
 
     //Set Viewports
     ren1->SetViewport(0, 0, .5, .5);
-    ren2->SetViewport(0, 0.5, 0, 0.5);
-    ren3->SetViewport(0.5, 0.5, 1.0, 1.0);
-    ren4->SetViewport(0.5, 1.0, 0.5, 1.0);
+    ren2->SetViewport(0, 0.5, 0.5, 1.0);
+    ren3->SetViewport(0.5, 0, 1.0, 0.5);
+    ren4->SetViewport(0.5, 0.5, 1.0, 1.0);
 
     //Add Renderers to Render Window
     rendWindow->AddRenderer(ren1);
@@ -68,12 +173,44 @@ int main(int argc, char* argv[]){
     rendWindow->AddRenderer(ren4);
 
     //Add Interactor
-    renderWindowInteractor->SetRenderWindow(rendWindow);
+    iren->SetRenderWindow(rendWindow);
 
-    //Add Actor to Renderer, Set Background and Size
+    //Add Actors
+    ren1->AddActor(ren1Actor);
+    ren1->SetBackground(0.0, 0.0, 0.0);
+
+    ren2->AddActor(planeActor);
+    ren2->AddActor(plane2Actor);
+    ren2->AddActor(plane3Actor);
+    ren2->AddActor(rectActor);
+    ren2->SetBackground(0,0,0);
+
+    ren3->AddActor(hedgehogActor);
+    ren3->SetBackground(0.0,0.0,0.0);
+
+    rendWindow->SetSize(600,600);
+
+    //Configure Active Cameras
+    ren1->GetActiveCamera()->SetFocalPoint(0,0,0);
+    ren1->GetActiveCamera()->SetPosition(0,0,70);
+    ren1->GetActiveCamera()->SetViewUp(0,1,0);
+    ren1->GetActiveCamera()->SetClippingRange(20, 120);
+    ren1->GetActiveCamera()->SetDistance(70);
+
+    ren2->GetActiveCamera()->SetFocalPoint(0,0,0);
+    ren2->GetActiveCamera()->SetPosition(0,0,70);
+    ren2->GetActiveCamera()->SetViewUp(0,1,0);
+    ren2->GetActiveCamera()->SetClippingRange(20, 120);
+    ren2->GetActiveCamera()->SetDistance(70);
+
+    ren3->GetActiveCamera()->SetFocalPoint(0,0,0);
+    ren3->GetActiveCamera()->SetPosition(0,0,70);
+    ren3->GetActiveCamera()->SetViewUp(0,1,0);
+    ren3->GetActiveCamera()->SetClippingRange(20, 120);
+    ren3->GetActiveCamera()->SetDistance(70);
 
     //Invokes Initial Render
-    iren->Initiate();
+    iren->Initialize();
     iren->Start();
 
     return EXIT_SUCCESS;
