@@ -19,6 +19,10 @@
 #include <vtkArrowSource.h>
 #include <vtkGlyph3D.h>
 #include <vtkDataSet.h>
+#include <vtkExtractRectilinearGrid.h>
+#include <vtkStreamTracer.h>
+#include <vtkPlaneSource.h>
+#include <vtkLineSource.h>
 
 
 #include <iostream>
@@ -99,29 +103,73 @@ int main(int argc, char* argv[]){
     //Set active attribute
     vtkDataSet *grad = rdr->GetOutput();
     grad->GetPointData()->SetActiveVectors("grad");
-    vtkSmartPointer<vtkHedgeHog> hedgehog = vtkSmartPointer<vtkHedgeHog>::New();
-    vtkSmartPointer<vtkArrowSource> arrowSource = vtkSmartPointer<vtkArrowSource>::New();
-    vtkSmartPointer<vtkGlyph3D> glyph = vtkSmartPointer<vtkGlyph3D>::New();
-
-    hedgehog->SetInputData(grad);
-    hedgehog->SetScaleFactor(0.1);
-
-    glyph->SetInputConnection(hedgehog->GetOutputPort());
+    vtkExtractRectilinearGrid *extrtRectGrid = vtkExtractRectilinearGrid::New();
+    extrtRectGrid->SetInputData(grad);
+    extrtRectGrid->SetSampleRate(5, 5, 5);
+    extrtRectGrid->Update();
+    //Create Filters
+    vtkHedgeHog *hedgehog = vtkHedgeHog::New();
+    vtkArrowSource *arrowSource = vtkArrowSource::New();
+    vtkGlyph3D *glyph = vtkGlyph3D::New();
+    //Configure HH Filter
+    hedgehog->SetInputData(extrtRectGrid->GetOutput());
+    hedgehog->SetScaleFactor(5);
+    hedgehog->Update();
+    //Configure ArrowSource
+    arrowSource->Update();
+    //Configure Glyphs
+    glyph->SetInputData(hedgehog->GetOutput());
     glyph->SetSourceConnection(arrowSource->GetOutputPort());
-    glyph->SetScaleModeToScaleByVector();
-    glyph->SetScaleFactor(0.1);
+    glyph->OrientOn();
+    glyph->Update();
 
     vtkSmartPointer<vtkDataSetMapper> hedgeHogMapper = vtkSmartPointer<vtkDataSetMapper>::New();
-    hedgeHogMapper->SetInputConnection(hedgehog->GetOutputPort());
-    hedgeHogMapper->SetScalarRange(rdr->GetOutput()->GetPointData()->GetScalars()->GetRange());
+    hedgeHogMapper->SetInputConnection(glyph->GetOutputPort());
+    hedgeHogMapper->SetScalarRange(grad->GetScalarRange());
 
     vtkSmartPointer<vtkActor> hedgehogActor = vtkSmartPointer<vtkActor>::New();
     hedgehogActor->SetMapper(hedgeHogMapper);
-    hedgehogActor->GetProperty()->SetColor(0,0,0);
 
+    //StreamTracer filter for Renderer 4
+    vtkStreamTracer *tracer = vtkStreamTracer::New();
+    tracer->SetIntegratorType(vtkStreamTracer::RUNGE_KUTTA4);
+    rdr->GetOutput()->GetPointData()->SetActiveVectors("grad");
+    tracer->SetInputData(rdr->GetOutput());
+    vtkLineSource *lineSrc = vtkLineSource::New();
+    lineSrc->SetPoint1(-9,0,0);
+    lineSrc->SetPoint2(0,0,-9);
+    
+    vtkPoints *points = vtkPoints::New();
+    points->InsertNextPoint(-9,0,0);
+    points->InsertNextPoint(-8,0,0);
+    points->InsertNextPoint(-7,0,0);
+    points->InsertNextPoint(-6,0,0);
+    points->InsertNextPoint(-5,0,0);
+    points->InsertNextPoint(-4,0,0);
+    points->InsertNextPoint(-3,0,0);
+    points->InsertNextPoint(-2,0,0);
+    points->InsertNextPoint(-1,0,0);
+    points->InsertNextPoint(0,0,0);
+    points->InsertNextPoint(1,0,0);
+    points->InsertNextPoint(2,0,0);
+    points->InsertNextPoint(3,0,0);
+    points->InsertNextPoint(4,0,0);
+    points->InsertNextPoint(5,0,0);
+    points->InsertNextPoint(7,0,0);
+    points->InsertNextPoint(8,0,0);
+    points->InsertNextPoint(9,0,0);
 
+    lineSrc->SetPoints(points);
+    tracer->SetSourceConnection(lineSrc->GetOutputPort());
+    tracer->SetMaximumPropagation(100);
+    tracer->SetInitialIntegrationStep(0.1);
+    tracer->Update();
 
-    //Streamlines filter for Renderer 4
+    vtkSmartPointer<vtkDataSetMapper> tracerMapper = vtkSmartPointer<vtkDataSetMapper>::New();
+    tracerMapper->SetInputConnection(tracer->GetOutputPort());
+    tracerMapper->Update();
+    tracerMapper->SetScalarRange(grad->GetScalarRange());
+    
 
     //Actors
         //Renderer 1
@@ -149,6 +197,11 @@ int main(int argc, char* argv[]){
     rectActor->GetProperty()->SetOpacity(0.5);
     rectActor->GetProperty()->SetColor(255,255,255);
     rectActor->SetMapper(rectMapper);
+
+        //Renderer 4
+    vtkSmartPointer<vtkActor> tracerActor = vtkSmartPointer<vtkActor>::New();
+    tracerActor->SetMapper(tracerMapper);
+    tracerActor->VisibilityOn();
         
     //Set Up Render Window and Interactor
     vtkSmartPointer<vtkRenderWindow> rendWindow = vtkSmartPointer<vtkRenderWindow>::New();
@@ -187,6 +240,9 @@ int main(int argc, char* argv[]){
 
     ren3->AddActor(hedgehogActor);
     ren3->SetBackground(0.0,0.0,0.0);
+
+    ren4->AddActor(tracerActor);
+    ren4->SetBackground(0.0,0.0,0.0);
 
     rendWindow->SetSize(600,600);
 
